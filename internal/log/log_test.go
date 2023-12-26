@@ -1,8 +1,9 @@
 package log
 
 import (
+	"errors"
 	"github.com/stretchr/testify/require"
-	log_v1 "go_log/api/v1"
+	api "go_log/api/v1"
 	"google.golang.org/protobuf/proto"
 	"io"
 	"os"
@@ -34,7 +35,7 @@ func TestLog(t *testing.T) {
 }
 
 func testTruncate(t *testing.T, log *Log) {
-	record := &log_v1.Record{Value: []byte("hello world")}
+	record := &api.Record{Value: []byte("hello world")}
 	for i := 0; i < 3; i++ {
 		_, err := log.Append(record)
 		require.NoError(t, err)
@@ -48,7 +49,7 @@ func testTruncate(t *testing.T, log *Log) {
 }
 
 func testReader(t *testing.T, log *Log) {
-	record := &log_v1.Record{Value: []byte("hello world")}
+	record := &api.Record{Value: []byte("hello world")}
 	off, err := log.Append(record)
 	require.NoError(t, err)
 	require.Equal(t, uint64(0), off)
@@ -57,7 +58,7 @@ func testReader(t *testing.T, log *Log) {
 	b, err := io.ReadAll(reader)
 	require.NoError(t, err)
 
-	read := &log_v1.Record{}
+	read := &api.Record{}
 	err = proto.Unmarshal(b[lenWidth:], read)
 	require.NoError(t, err)
 	require.Equal(t, record.Value, read.Value)
@@ -65,7 +66,7 @@ func testReader(t *testing.T, log *Log) {
 }
 
 func testInitExisting(t *testing.T, log *Log) {
-	record := &log_v1.Record{Value: []byte("hello world")}
+	record := &api.Record{Value: []byte("hello world")}
 	for i := 0; i < 3; i++ {
 		_, err := log.Append(record)
 		require.NoError(t, err)
@@ -96,11 +97,13 @@ func testInitExisting(t *testing.T, log *Log) {
 func testOutOfRangeErr(t *testing.T, log *Log) {
 	read, err := log.Read(1)
 	require.Nil(t, read)
-	require.Error(t, err)
+	var apiErr api.ErrOffsetOutOfRange
+	errors.As(err, &apiErr)
+	require.Equal(t, uint64(1), apiErr.Offset)
 }
 
 func testAppendRead(t *testing.T, log *Log) {
-	record := &log_v1.Record{Value: []byte("hello world")}
+	record := &api.Record{Value: []byte("hello world")}
 	off, err := log.Append(record)
 	require.NoError(t, err)
 	require.Equal(t, uint64(0), off)

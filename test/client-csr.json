@@ -1,0 +1,13 @@
+{
+  "CN": "client",
+  "hosts": [""], "key": {
+  "algo": "rsa",
+  "size": 2048 },
+  "names": [ {
+    "C": "NG",
+    "L": "Ilorin",
+    "ST": "Kwara",
+    "O": "BrainByteLabs Company",
+    "OU": "Distributed Services"
+  } ]
+}

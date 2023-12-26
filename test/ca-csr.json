@@ -1,0 +1,16 @@
+{
+  "CN": "Intellect CA",
+  "key": {
+    "algo": "rsa",
+    "size": 2048
+  },
+  "names": [
+    {
+      "C": "NG",
+      "ST": "Kwara",
+      "L": "Ilorin",
+      "O": "BrainBytesLab Company",
+      "OU": "CA Services"
+    }
+  ]
+}
