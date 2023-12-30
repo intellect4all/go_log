@@ -4,12 +4,20 @@ import (
 	"context"
 	grpcmiddleware "github.com/grpc-ecosystem/go-grpc-middleware"
 	grpcauth "github.com/grpc-ecosystem/go-grpc-middleware/auth"
+	grpczap "github.com/grpc-ecosystem/go-grpc-middleware/logging/zap"
+	grpcctxtags "github.com/grpc-ecosystem/go-grpc-middleware/tags"
+	"go.opencensus.io/plugin/ocgrpc"
+	"go.opencensus.io/stats/view"
+	"go.opencensus.io/trace"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	api "go_log/api/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	peer2 "google.golang.org/grpc/peer"
 	"google.golang.org/grpc/status"
+	"time"
 )
 
 type Config struct {
@@ -30,9 +38,29 @@ type Authorizer interface {
 var _ api.LogServer = (*grpcServer)(nil)
 
 func NewGRPCServer(c *Config, opts ...grpc.ServerOption) (*grpc.Server, error) {
+	logger := zap.L().Named("server")
+	zapOpts := []grpczap.Option{grpczap.WithDurationField(func(duration time.Duration) zapcore.Field {
+		return zap.Int64("grpc.time_ns", duration.Nanoseconds())
+	},
+	),
+	}
+
+	trace.ApplyConfig(trace.Config{DefaultSampler: trace.AlwaysSample()})
+	err := view.Register(ocgrpc.DefaultServerViews...)
+
+	if err != nil {
+		return nil, err
+	}
+
 	opts = append(opts, grpc.StreamInterceptor(grpcmiddleware.ChainStreamServer(
-		grpcauth.StreamServerInterceptor(authenticate))), grpc.UnaryInterceptor(grpcmiddleware.ChainUnaryServer(
-		grpcauth.UnaryServerInterceptor(authenticate))))
+		grpcauth.StreamServerInterceptor(authenticate))),
+		grpc.UnaryInterceptor(grpcmiddleware.ChainUnaryServer(
+			grpcctxtags.UnaryServerInterceptor(),
+			grpczap.UnaryServerInterceptor(logger, zapOpts...),
+			grpcauth.UnaryServerInterceptor(authenticate))),
+	)
+
+	grpc.StatsHandler(&ocgrpc.ServerHandler{})
 
 	gsrv := grpc.NewServer(opts...)
 	srv, err := newGrpcServer(c)
